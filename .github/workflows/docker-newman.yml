@@ -50,8 +50,8 @@ jobs:
           docker logs fit4110-iot-lab04
 
       - name: Wait for service health
-        run: npx wait-on http://127.0.0.1:8000/health --timeout 30000
-
+        run: npx wait-on http-get://127.0.0.1:8000/health --timeout 30000
+        
       - name: Run Newman against Docker container
         run: npm run test:local
 
