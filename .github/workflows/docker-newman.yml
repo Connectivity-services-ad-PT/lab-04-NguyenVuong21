@@ -25,19 +25,27 @@ jobs:
       - name: Build Docker image
         run: docker build -t fit4110/iot-ingestion:lab04 .
 
+      - name: Prepare Environment File
+        run: |
+          if [ -f .env.example ]; then
+            cp .env.example .env
+          else
+            echo "AUTH_TOKEN=local-dev-token" > .env
+          fi
+          # Ghi đè token kiểm thử vào file .env vừa tạo
+          echo "AUTH_TOKEN=local-dev-token" >> .env
+
       - name: Run Docker container
         run: |
-          # Khởi chạy bằng cách nạp file mẫu đồng thời đè token kiểm thử lên
           docker run -d \
             --name fit4110-iot-lab04 \
             -p 8000:8000 \
-            --env-file .env.example \
-            --env AUTH_TOKEN=local-dev-token \
+            --env-file .env \
             fit4110/iot-ingestion:lab04
 
-      - name: Check Container Status & Show Early Logs
+      - name: Check Container Boot Logs
         run: |
-          sleep 3
+          sleep 5
           docker ps -a
           docker logs fit4110-iot-lab04
 
@@ -50,10 +58,6 @@ jobs:
       - name: Show container logs on failure
         if: failure()
         run: docker logs fit4110-iot-lab04 || true
-
-      - name: Stop container
-        if: always()
-        run: docker stop fit4110-iot-lab04 || true
 
       - name: Create reports directory
         if: always()
