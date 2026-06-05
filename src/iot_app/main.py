@@ -97,11 +97,9 @@ def build_problem(
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
-    # Nếu exc.detail đã là dict (ProblemDetails chuẩn) thì dùng luôn
     if isinstance(exc.detail, dict):
         problem = exc.detail
     else:
-        # Nếu exc.detail là chuỗi thô (như lỗi từ hàm verify), bọc nó lại thành dict ProblemDetails chuẩn
         problem = build_problem(
             status_code=exc.status_code,
             title="Unauthorized" if exc.status_code == 401 else status.HTTP_STATUS_CODES.get(exc.status_code, "HTTP Error"),
@@ -143,26 +141,14 @@ def verify_bearer_token(authorization: Optional[str] = Header(default=None)) -> 
     if not authorization:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing Authorization header",  # Để chuỗi ngắn gọn
+            detail="Missing Authorization header",
         )
 
     expected = f"Bearer {AUTH_TOKEN}"
     if authorization != expected:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid bearer token",  # Để chuỗi ngắn gọn
-        )
-
-    expected = f"Bearer {AUTH_TOKEN}"
-    if authorization != expected:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=build_problem(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                title="Unauthorized",
-                detail="Invalid bearer token",
-                problem_type="https://smart-campus.local/problems/unauthorized",
-            ),
+            detail="Invalid bearer token",
         )
 
 
@@ -170,15 +156,19 @@ def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
-# FIX LỖI #1: Sinh ID chuẩn định dạng RegExp khuôn mẫu R-YYYYMMDD-XXXX của trường
 def next_reading_id() -> str:
     today_str = datetime.now(timezone.utc).strftime("%Y%m%d")
     sequence_num = len(READINGS) + 1
     return f"R-{today_str}-{sequence_num:04d}"
 
 
-@app.get("/health", response_model=HealthResponse)
-def health() -> HealthResponse:
+# 🔥 SỬA LỖI 405: Chuyển sang app.api_route để chấp nhận cả phương thức HEAD từ wait-on linter trên GitHub
+@app.api_route("/health", methods=["GET", "HEAD"], response_model=HealthResponse)
+def health(request: Request) -> Optional[HealthResponse]:
+    # Nếu lệnh thăm dò chỉ gửi gói HEAD, phản hồi nhanh bằng HTTP 200 trống (không cần tốn băng thông sinh body)
+    if request.method == "HEAD":
+        return None
+        
     return HealthResponse(
         status="ok",
         service=SERVICE_NAME,
