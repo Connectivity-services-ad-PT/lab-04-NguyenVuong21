@@ -10,10 +10,10 @@
     "test:local": "newman run postman/collections/FIT4110_lab04_iot_docker.postman_collection.json -e postman/environments/FIT4110_lab04_local.postman_environment.json -r cli,junit,htmlextra --reporter-junit-export reports/newman-lab04-local.xml --reporter-htmlextra-export reports/newman-lab04-local.html"
   },
   "devDependencies": {
-    "@stoplight/prism-cli": "^5.10.0",
+    "@stoplight/prism-cli": "^5.6.0",
     "@stoplight/spectral-cli": "^6.13.1",
-    "newman": "^6.2.1",
-    "newman-reporter-htmlextra": "^1.23.1",
+    "newman": "^2.1.2",
+    "newman-reporter-htmlextra": "^1.22.5",
     "wait-on": "^8.0.1"
   }
 }
