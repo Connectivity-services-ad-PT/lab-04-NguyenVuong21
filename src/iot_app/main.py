@@ -18,7 +18,7 @@ app = FastAPI(
     title="FIT4110 Lab 04 - IoT Ingestion Service",
     version=SERVICE_VERSION,
     description=(
-        "Dockerized IoT Ingestion API aligned with the Lab 03 OpenAPI/Postman contract."
+        "Dockerized IoT Ingestion API aligned with the Lab 03/04 OpenAPI/Postman contract."
     ),
 )
 
@@ -65,16 +65,6 @@ class SensorReadingCreate(BaseModel):
     timestamp: str = Field(..., examples=["2026-05-13T08:30:00+07:00"])
 
 
-class SensorReading(BaseModel):
-    reading_id: str
-    device_id: str
-    metric: SensorMetric
-    value: float
-    unit: Optional[SensorUnit] = None
-    timestamp: str
-    created_at: str
-
-
 class SensorReadingCreated(BaseModel):
     reading_id: str
     device_id: str
@@ -107,27 +97,23 @@ def build_problem(
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
+    # Nếu exc.detail đã là dict (ProblemDetails chuẩn) thì dùng luôn
     if isinstance(exc.detail, dict):
         problem = exc.detail
     else:
+        # Nếu exc.detail là chuỗi thô (như lỗi từ hàm verify), bọc nó lại thành dict ProblemDetails chuẩn
         problem = build_problem(
             status_code=exc.status_code,
-            title=status.HTTP_STATUS_CODES.get(exc.status_code, "HTTP Error"),
+            title="Unauthorized" if exc.status_code == 401 else status.HTTP_STATUS_CODES.get(exc.status_code, "HTTP Error"),
             detail=str(exc.detail),
             instance=str(request.url.path),
+            problem_type="https://smart-campus.local/problems/unauthorized" if exc.status_code == 401 else "about:blank"
         )
-
-    problem.setdefault("status", exc.status_code)
-    problem.setdefault("title", status.HTTP_STATUS_CODES.get(exc.status_code, "HTTP Error"))
-    problem.setdefault("type", "about:blank")
-    problem.setdefault("detail", "Request failed")
-    problem.setdefault("instance", str(request.url.path))
 
     return JSONResponse(
         status_code=exc.status_code,
         content=problem,
-        media_type="application/problem+json",
-        headers=getattr(exc, "headers", None),
+        media_type="application/problem+json"
     )
 
 
@@ -136,7 +122,7 @@ async def validation_exception_handler(
     request: Request, exc: RequestValidationError
 ) -> JSONResponse:
     first_error = exc.errors()[0] if exc.errors() else {}
-    location = ".".join(str(item) for item in first_error.get("loc", []))
+    location = ".".join(str(item) for item in first_error.get("loc", []) if item != "body")
     message = first_error.get("msg", "Request validation error")
     detail = f"{location}: {message}" if location else message
 
@@ -149,7 +135,7 @@ async def validation_exception_handler(
             instance=str(request.url.path),
             problem_type="https://smart-campus.local/problems/validation-error",
         ),
-        media_type="application/problem+json",
+        headers={"Content-Type": "application/problem+json"}
     )
 
 
@@ -157,12 +143,14 @@ def verify_bearer_token(authorization: Optional[str] = Header(default=None)) -> 
     if not authorization:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=build_problem(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                title="Unauthorized",
-                detail="Missing Authorization header",
-                problem_type="https://smart-campus.local/problems/unauthorized",
-            ),
+            detail="Missing Authorization header",  # Để chuỗi ngắn gọn
+        )
+
+    expected = f"Bearer {AUTH_TOKEN}"
+    if authorization != expected:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid bearer token",  # Để chuỗi ngắn gọn
         )
 
     expected = f"Bearer {AUTH_TOKEN}"
@@ -179,12 +167,14 @@ def verify_bearer_token(authorization: Optional[str] = Header(default=None)) -> 
 
 
 def now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
+# FIX LỖI #1: Sinh ID chuẩn định dạng RegExp khuôn mẫu R-YYYYMMDD-XXXX của trường
 def next_reading_id() -> str:
-    today = datetime.now(timezone.utc).strftime("%Y%m%d")
-    return f"R-{today}-{len(READINGS) + 1:04d}"
+    today_str = datetime.now(timezone.utc).strftime("%Y%m%d")
+    sequence_num = len(READINGS) + 1
+    return f"R-{today_str}-{sequence_num:04d}"
 
 
 @app.get("/health", response_model=HealthResponse)
@@ -204,7 +194,6 @@ def health() -> HealthResponse:
     responses={
         401: {"model": ProblemDetails},
         422: {"model": ProblemDetails},
-        429: {"model": ProblemDetails},
     },
 )
 def create_reading(payload: SensorReadingCreate, response: Response) -> SensorReadingCreated:

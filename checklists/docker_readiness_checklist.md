@@ -31,7 +31,8 @@
 ## Evidence
 
 - [ ] Có ảnh/log `docker build`.
-- [ ] Có ảnh/log `docker run`.
+- [ ] Có ảnh/log `docker run`.f
+
 - [ ] Có ảnh/log `curl /health`.
 - [ ] Có Newman HTML/XML report.
 - [ ] Có tag image đúng quy ước.
