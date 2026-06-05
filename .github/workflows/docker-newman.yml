@@ -27,14 +27,22 @@ jobs:
 
       - name: Run Docker container
         run: |
-          docker run -d --rm \
+          # Khởi chạy bằng cách nạp file mẫu đồng thời đè token kiểm thử lên
+          docker run -d \
             --name fit4110-iot-lab04 \
             -p 8000:8000 \
+            --env-file .env.example \
             --env AUTH_TOKEN=local-dev-token \
             fit4110/iot-ingestion:lab04
 
+      - name: Check Container Status & Show Early Logs
+        run: |
+          sleep 3
+          docker ps -a
+          docker logs fit4110-iot-lab04
+
       - name: Wait for service health
-        run: npx wait-on http://localhost:8000/health --timeout 30000
+        run: npx wait-on http://127.0.0.1:8000/health --timeout 30000
 
       - name: Run Newman against Docker container
         run: npm run test:local
