@@ -15,10 +15,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: "npm"
+          # ĐÃ GỠ BỎ cache: "npm" ĐỂ TRÁNH LỖI ĐỒNG BỘ CỨNG LOCK FILE
 
       - name: Install Node dependencies
-        run: npm ci
+        run: npm install --legacy-peer-deps # ĐÃ ĐỔI TỪ npm ci THÀNH LỆNH CÀI NỚI LỎNG PHIÊN BẢN
 
       - name: Lint OpenAPI contract
         run: npm run lint:openapi
@@ -31,7 +31,7 @@ jobs:
           docker run -d --rm \
             --name fit4110-iot-lab04 \
             -p 8000:8000 \
-            --env-file .env.example \
+            --env AUTH_TOKEN=local-dev-token \
             fit4110/iot-ingestion:lab04
 
       - name: Wait for service health
@@ -50,7 +50,9 @@ jobs:
 
       - name: Upload Newman reports
         if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: lab04-newman-reports
-          path: reports/
+        run: |
+          mkdir -p reports
+          uses: actions/upload-artifact@v4
+          with:
+            name: lab04-newman-reports
+            path: reports/
